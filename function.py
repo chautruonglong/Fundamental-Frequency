@@ -1,23 +1,26 @@
 from numpy import round, real, array
 from numpy.fft import fft, ifft
+from scipy.signal import medfilt
 
 
 def autocorr(x):  # O(n^2)
-    n = len(x)
-    auto_corr = [0] * n
-    delay = range(0, n)
+    n = len(x)  # Lấy độ dài của tín hiệu x
+    auto_corr = [0] * n  # Khởi tạo mảng để lưu kết quả và trả về
+    delay = range(0, n)  # Sinh mảng delay
     for i in range(n):
         for j in range(n - delay[i]):
-            auto_corr[i] += x[j] * x[j + delay[i]]
-    return round(auto_corr, 8)
+            auto_corr[i] += x[j] * x[j + delay[i]]  # Tự tương quan tại độ trễ delay[i]
+    return round(auto_corr, 8)  # Trả về kết quả và làm tròn 8 chữ số thập phân
 
 
 def fftautocorr(x):  # O(n * log(n))
+    # Độ dài của y[n] = x[n] * h[n] theo công thức N * M - 1
+    # Trong đó N, M lần lượt là độ dài của x và h
     n = 2 * len(x) - 1
-    a = fft(x, n)
-    b = fft(x[::-1], n)
-    c = ifft(a * b)
-    return real(c[n // 2:])
+    a = fft(x, n)  # Fast fourier tranform x[n]
+    b = fft(x[::-1], n)  # Fast fourier tranform x[-n]
+    c = ifft(a * b)  # Inverse fast fourier tranform
+    return real(c[n // 2:])  # Trả về nữa cuối của mảng, chỉ lấy phần thực, bỏ đi phần ảo
 
 
 def get_index_of_max_local(auto_corr, max_indexes):
@@ -29,10 +32,13 @@ def get_index_of_max_local(auto_corr, max_indexes):
 
 
 def find_peaks(arr):
-    size = len(arr)  # get size of input array
-    index_peaks = []  # save all index of peaks
-    index_tmp = 0  # temp for check case [1, 2, 5, 5, 5, 1]
-    is_tmp = False  # boolean for check case [2, 2, 2, 1]
+    size = len(arr)  # Lấy độ dài của mảng đầu vào
+    index_peaks = []  # Lưu các index của các đỉnh
+    index_tmp = 0  # Biến tạm để kiểm tra trường hợp đỉnh nằm ngang(có các giá trị liên tiếp bằng nhau) [1, 2, 5, 5, 5, 1]
+    is_tmp = False  # Biến để kiểm tra trường hợp này [2, 2, 2, 1]
+    
+    # Ý tưởng: duyệt mảng từ 1 đến n-2
+    # Tại phần tử đang xét so sánh với hai phần tử bên cạnh
     for i in range(1, size - 1, 1):
         if arr[i] > arr[i - 1] and arr[i] > arr[i + 1]:
             index_peaks.append(i)
@@ -42,7 +48,7 @@ def find_peaks(arr):
         elif arr[i] == arr[i - 1] and arr[i] > arr[i + 1] and is_tmp is True:
             index_peaks.append(i)
             is_tmp = False
-    return index_peaks
+    return index_peaks  # Trả về index của các đỉnh trong mảng đầu vào
 
 
 # get file name from path
@@ -54,24 +60,24 @@ def get_fine_name(path):
 # median filter
 def median_filter(arr, kernel_size):
     if type(arr) is not list:
-        arr = arr.tolist()
+        arr = arr.tolist()  # Kiểm tra có phải kiểu dữ liệu "list" không
 
-    length = len(arr)
-    part = (kernel_size - 1) // 2
-    med_arr = []
+    length = len(arr)  # Lấy độ dài của mảng đầu vào
+    part = (kernel_size - 1) // 2  # Tính số phần tử ở mỗi bên (trái, phải)
+    med_arr = []  # Khởi tạo mảng mới để trả về kết quả
 
     for i in range(length):
         left = i - part
         right = i + part
-        if left < 0:
-            tmp = [0] * (0 - left) + arr[0:right + 1]
-        elif right >= length:
-            tmp = arr[left:length] + [0] * (right - length + 1)
-        else:
+        if left < 0:  # Trường hợp bên trái không đủ phần tử
+            tmp = [0] * (0 - left) + arr[0:right + 1]  # Thêm phần tử 0 vào bên trái
+        elif right >= length:  # Trường hợp bên phải không đủ phần tử
+            tmp = arr[left:length] + [0] * (right - length + 1)  # Thêm phần tử 0 vào bên phải
+        else:  # Trường hợp hai bên đều đủ
             tmp = arr[left: right + 1]
-        tmp.sort()
-        med_arr.append(tmp[part])
-    return array(med_arr)
+        tmp.sort()  # Sắp xếp tăng dần
+        med_arr.append(tmp[part])  # Thêm vào mảng
+    return array(med_arr)  # Trả về kết quả sau khi lọc
 
 
 # calc all F0

@@ -157,10 +157,12 @@ def show_pitch_contour():
         indexes[i] *= duration / len(data)
 
     # scatter before median filter
+    graph_2.set_title('Before median filter, F0 = ' + str(round(sum(F0s) / len(F0s), 3)))
     scatter_2 = graph_2.scatter(indexes, F0s, color='black', marker='*', s=15)
 
     # scatter after median filter
     F0s = median_filter(F0s, ker_size)
+    graph_1.set_title('After median filter, F0 = ' + str(round(sum(F0s) / len(F0s), 3)))
     scatter_1 = graph_1.scatter(indexes, F0s, color='black', marker='*', s=15)
 
     loader.place_forget()
@@ -194,7 +196,6 @@ is_redraw = False
 
 # for before median filter
 graph_1 = figure.add_subplot(311)
-graph_1.set_title('After median filter')
 graph_1.set_ylabel('Frequency (Hz)')
 graph_1.set_xlabel('Time')
 graph_1.set_ylim(0, 400)
@@ -203,7 +204,6 @@ figure.tight_layout()
 
 # for after median filter
 graph_2 = figure.add_subplot(312)
-graph_2.set_title('Before median filter')
 graph_2.set_ylabel('Frequency (Hz)')
 graph_2.set_xlabel('Time')
 graph_2.set_ylim(0, 400)
