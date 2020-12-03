@@ -1,6 +1,5 @@
 from numpy import round, real, array
 from numpy.fft import fft, ifft
-from scipy.signal import medfilt
 
 
 def autocorr(x):  # O(n^2)
