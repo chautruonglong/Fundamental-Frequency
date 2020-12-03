@@ -21,6 +21,8 @@ ker_size = 0  # size of median filter
 ratio = 0.0  # percent of global maximum
 window = 0  # number of samples per window (samples)
 ham = []  # hamming window function
+min_frame = 0  # frame at F0 = 75 Hz of window
+max_frame = 0  # frame at F0 = 350 Hz of window
 
 
 # handle event root resize
@@ -134,7 +136,7 @@ hold_box.place(x=10, y=460, width=100)
 
 
 def show_pitch_contour():
-    global scatter_1, scatter_2, is_loader, is_redraw, win_len, ker_size, ratio, window, ham
+    global scatter_1, scatter_2, is_loader, is_redraw, win_len, ker_size, ratio, window, ham, min_frame, max_frame
     # update figure
     if scatter_1 is not None:
         scatter_1.remove()
@@ -147,10 +149,17 @@ def show_pitch_contour():
     win_len = int(win_box.get()[0:2])
     ker_size = int(ker_box.get())
     ratio = int(hold_box.get()[0:2]) / 100
+
+    # calc params
     window = int((win_len * len(data) / (duration * 1000)))
     ham = hamming(window)
+    min_delay = 1000 / 350  # ms
+    max_delay = 1000 / 75  # ms
+    min_frame = int(min_delay * window / win_len)
+    max_frame = int(max_delay * window / win_len)
 
-    F0s, indexes = pitch_contour(data, duration, win_len, window, ham, ratio)  # pitch contour to find basic frequency
+    # pitch contour to find basic frequency
+    F0s, indexes = pitch_contour(data, win_len, window, ham, ratio, min_frame, max_frame)
 
     # convert samples to time
     for i in range(len(indexes)):
@@ -263,45 +272,53 @@ child_figure.tight_layout()
 
 child_graph_2 = child_figure.add_subplot(212)
 child_plot_2 = None
-child_line_2 = None
+child_v_line_2 = None
+child_left_line_2 = None
+child_right_line_2 = None
 child_scatter_2 = None
 child_figure.tight_layout()
 
 
 def update_child_fig(frame):
-    global child_plot_1, child_plot_2, child_line_2, child_scatter_2
-    x = data[frame:frame + window] * ham
-    a = fftautocorr(x)
+    global child_plot_1, child_plot_2, child_h_line_2, child_scatter_2, child_left_v_line_2, child_right_v_line_2
+    w = data[frame:frame + window] * ham
+    a = fftautocorr(w)
     threshold = a[0] * ratio
     is_periodicity = True
 
+    # remove all old plot
     if child_plot_1 is not None:
         child_plot_1.pop(0).remove()
         child_plot_1 = None
-    if child_plot_2 is not None:
         child_plot_2.pop(0).remove()
         child_plot_2 = None
-    if child_line_2 is not None:
-        child_line_2.remove()
-        child_line_2 = None
+        child_h_line_2.remove()
+        child_h_line_2 = None
+        child_left_v_line_2.remove()
+        child_left_v_line_2 = None
+        child_right_v_line_2.remove()
+        child_right_v_line_2 = None
     if child_scatter_2 is not None:
         child_scatter_2.remove()
         child_scatter_2 = None
 
     # plot original window
     child_graph_1.set_xlim(-20, window)
-    child_graph_1.set_ylim(x.min(), x.max())
-    child_plot_1 = child_graph_1.plot(x, color='blue')
+    child_graph_1.set_ylim(w.min(), w.max())
+    child_plot_1 = child_graph_1.plot(w, color='blue')
 
     # plot auto correlation window
     child_graph_2.set_xlim(-20, window)
     child_graph_2.set_ylim(a.min(), a.max())
     child_graph_2.set_title('Not periodicity, F0 = NaN')
     child_plot_2 = child_graph_2.plot(a, color='blue')  # plot autocorr
-    child_line_2 = child_graph_2.hlines(threshold, -20, window, color='orange', linestyles='--')  # draw threshold line
+    child_h_line_2 = child_graph_2.hlines(threshold, -20, window, color='orange', linestyles='--')  # draw threshold line
+    # draw limit delay window
+    child_left_v_line_2 = child_graph_2.vlines(min_frame, a.min(), a.max(), color='green')
+    child_right_v_line_2 = child_graph_2.vlines(max_frame, a.min(), a.max(), color='green')
 
-    max_indexes = find_peaks(a)
-    min_indexes = find_peaks(-1 * a)
+    max_indexes = find_peaks(a, min_frame, max_frame)
+    min_indexes = find_peaks(-1 * a, min_frame, max_frame)
     if len(max_indexes) == 0 or len(min_indexes) == 0:
         is_periodicity = False
 

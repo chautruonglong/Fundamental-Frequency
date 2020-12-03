@@ -22,15 +22,14 @@ def fftautocorr(x):  # O(n * log(n))
     return real(c[n // 2:])  # Trả về nữa cuối của mảng, chỉ lấy phần thực, bỏ đi phần ảo
 
 
-def find_peaks(arr):
-    size = len(arr)  # Lấy độ dài của mảng đầu vào
+def find_peaks(arr, min_frame, max_frame):
     index_peaks = []  # Lưu các index của các đỉnh
     index_tmp = 0  # Biến tạm để kiểm tra trường hợp đỉnh nằm ngang(có các giá trị liên tiếp bằng nhau) [1, 2, 5, 5, 5, 1]
     is_tmp = False  # Biến để kiểm tra trường hợp này [2, 2, 2, 1]
-    
-    # Ý tưởng: duyệt mảng từ 1 đến n-2
+
+    # Ý tưởng: duyệt mảng từ min_frame đến max_frame
     # Tại phần tử đang xét so sánh với hai phần tử bên cạnh
-    for i in range(1, size - 1, 1):
+    for i in range(min_frame, max_frame):
         if arr[i] > arr[i - 1] and arr[i] > arr[i + 1]:
             index_peaks.append(i)
         elif arr[i] > arr[i - 1] and arr[i] == arr[i + 1]:
@@ -72,20 +71,20 @@ def median_filter(arr, kernel_size):
 
 
 # calc all F0
-def pitch_contour(data, duration, win_len, window, ham, ratio):
+def pitch_contour(data, win_len, window, ham, ratio, min_frame, max_frame):
     F0s = []  # for save valid F0
     indexes = []  # for save index of window have valid F0
     index = 0  # for counter
     while index + window <= len(data):
-        x = data[index:index + window]  # get current window
-        x = x * ham  # smoothing window
+        w = data[index:index + window]  # get current window
+        w = w * ham  # smoothing window
         index += window // 2  # next window
-        a_corr = fftautocorr(x)  # calc auto correlation
-        threshold = a_corr[0] * ratio  # calc threshold = 30% maximum global
+        a_corr = fftautocorr(w)  # calc auto correlation
+        threshold = a_corr[0] * ratio  # calc threshold = n% maximum global
 
         # find top peaks, bottom peaks and check it
-        max_indexes = find_peaks(a_corr)  # find top peaks
-        min_indexes = find_peaks(-1 * a_corr)  # find bottom peaks
+        max_indexes = find_peaks(a_corr, min_frame, max_frame)  # find top peaks
+        min_indexes = find_peaks(-1 * a_corr, 0, len(a_corr) - 1)  # find bottom peaks
         if len(max_indexes) == 0 or len(min_indexes) == 0:
             continue
 
@@ -93,14 +92,12 @@ def pitch_contour(data, duration, win_len, window, ham, ratio):
         max_index = get_index_of_max_local(a_corr, max_indexes)  # get index of max_indexes
         max_local = a_corr[max_indexes[max_index]]
         min_local = a_corr[min_indexes[max_index]]
-        if max_local < threshold or max_local - min_local < 0.01:
+        if max_local < threshold or max_local - min_local < 0.02:
             continue
 
         # calc basic frequency and check it
         T0 = max_indexes[max_index] * win_len / window
         F0 = 1000 / T0
-        if F0 > 350 or F0 < 75:
-            continue
 
         # append F0 and index
         F0s.append(F0)
