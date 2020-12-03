@@ -296,9 +296,9 @@ def update_child_fig(frame):
     # plot auto correlation window
     child_graph_2.set_xlim(-20, window)
     child_graph_2.set_ylim(a.min(), a.max())
-    child_graph_2.set_title('Not periodicity')
+    child_graph_2.set_title('Not periodicity, F0 = NaN')
     child_plot_2 = child_graph_2.plot(a, color='blue')  # plot autocorr
-    child_line_2 = child_graph_2.hlines(threshold, -20, window, color='orange')  # draw threshold line
+    child_line_2 = child_graph_2.hlines(threshold, -20, window, color='orange', linestyles='--')  # draw threshold line
 
     max_indexes = find_peaks(a)
     min_indexes = find_peaks(-1 * a)
@@ -316,10 +316,11 @@ def update_child_fig(frame):
         T0 = max_indexes[max_index] * win_len / window
         F0 = 1000 / T0
         if F0 > 350 or F0 < 75:
+            child_graph_2.set_title('Periodicity, out F0 = ' + str(round(F0, 3)))
             is_periodicity = False
 
     if is_periodicity is True:
-        child_graph_2.set_title('Periodicity')
+        child_graph_2.set_title('Periodicity, F0 = ' + str(round(F0, 3)))
         child_scatter_2 = child_graph_2.scatter(max_indexes[max_index], max_local, color='red')
 
     child_figure.canvas.draw()

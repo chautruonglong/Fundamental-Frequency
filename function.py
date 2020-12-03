@@ -6,7 +6,7 @@ def autocorr(x):  # O(n^2)
     n = len(x)  # Lấy độ dài của tín hiệu x
     auto_corr = [0] * n  # Khởi tạo mảng để lưu kết quả và trả về
     delay = range(0, n)  # Sinh mảng delay
-    for i in range(n):
+    for i in delay:
         for j in range(n - delay[i]):
             auto_corr[i] += x[j] * x[j + delay[i]]  # Tự tương quan tại độ trễ delay[i]
     return round(auto_corr, 8)  # Trả về kết quả và làm tròn 8 chữ số thập phân
@@ -20,14 +20,6 @@ def fftautocorr(x):  # O(n * log(n))
     b = fft(x[::-1], n)  # Fast fourier tranform x[-n]
     c = ifft(a * b)  # Inverse fast fourier tranform
     return real(c[n // 2:])  # Trả về nữa cuối của mảng, chỉ lấy phần thực, bỏ đi phần ảo
-
-
-def get_index_of_max_local(auto_corr, max_indexes):
-    index = 0
-    for i in range(1, len(max_indexes)):
-        if auto_corr[max_indexes[i]] > auto_corr[max_indexes[index]]:
-            index = i
-    return index
 
 
 def find_peaks(arr):
@@ -116,3 +108,11 @@ def pitch_contour(data, duration, win_len, window, ham, ratio):
 
     # return tuple
     return F0s, indexes
+
+
+def get_index_of_max_local(auto_corr, max_indexes):
+    index = 0
+    for i in range(1, len(max_indexes)):
+        if auto_corr[max_indexes[i]] > auto_corr[max_indexes[index]]:
+            index = i
+    return index
