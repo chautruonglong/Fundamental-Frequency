@@ -3,32 +3,32 @@ from numpy.fft import fft, ifft
 
 
 def autocorr(x):  # O(n^2)
-    n = len(x)  # Lấy độ dài của tín hiệu x
-    auto_corr = [0] * n  # Khởi tạo mảng để lưu kết quả và trả về
-    delay = range(0, n)  # Sinh mảng delay
+    n = len(x)  # get length x
+    auto_corr = [0] * n  # for save auto correlation
+    delay = range(0, n)  # delay arr
     for i in delay:
         for j in range(n - delay[i]):
-            auto_corr[i] += x[j] * x[j + delay[i]]  # Tự tương quan tại độ trễ delay[i]
-    return round(auto_corr, 8)  # Trả về kết quả và làm tròn 8 chữ số thập phân
+            auto_corr[i] += x[j] * x[j + delay[i]]  # auto correlation at delay[i]
+    return round(auto_corr, 8)
 
 
 def fftautocorr(x):  # O(n * log(n))
-    # Độ dài của y[n] = x[n] * h[n] theo công thức N * M - 1
-    # Trong đó N, M lần lượt là độ dài của x và h
+    # length of y[n] = x[n] * h[n] calc: N * M - 1
+    # in N is length x, M is length h
     n = 2 * len(x) - 1
-    a = fft(x, n)  # Fast fourier tranform x[n]
-    b = fft(x[::-1], n)  # Fast fourier tranform x[-n]
-    c = ifft(a * b)  # Inverse fast fourier tranform
-    return real(c[n // 2:])  # Trả về nữa cuối của mảng, chỉ lấy phần thực, bỏ đi phần ảo
+    a = fft(x, n)  # Fast fourier transform x[n]
+    b = fft(x[::-1], n)  # Fast fourier transform x[-n]
+    c = ifft(a * b)  # Inverse fast fourier transform
+    return real(c[n // 2:])  # return the last half of arr, only get real
 
 
 def find_peaks(arr, min_frame, max_frame):
-    index_peaks = []  # Lưu các index của các đỉnh
-    index_tmp = 0  # Biến tạm để kiểm tra trường hợp đỉnh nằm ngang(có các giá trị liên tiếp bằng nhau) [1, 2, 5, 5, 5, 1]
-    is_tmp = False  # Biến để kiểm tra trường hợp này [2, 2, 2, 1]
+    index_peaks = []  # for save all index of maximum local
+    index_tmp = 0  # for check case [1, 2, 5, 5, 5, 1]
+    is_tmp = False  # for check case [2, 2, 2, 1]
 
-    # Ý tưởng: duyệt mảng từ min_frame đến max_frame
-    # Tại phần tử đang xét so sánh với hai phần tử bên cạnh
+    # idea: browse arr from min_frame to max_frame
+    # at the element being compared with two adjacent elements
     for i in range(min_frame, max_frame):
         if arr[i] > arr[i - 1] and arr[i] > arr[i + 1]:
             index_peaks.append(i)
@@ -38,7 +38,7 @@ def find_peaks(arr, min_frame, max_frame):
         elif arr[i] == arr[i - 1] and arr[i] > arr[i + 1] and is_tmp is True:
             index_peaks.append(i)
             is_tmp = False
-    return index_peaks  # Trả về index của các đỉnh trong mảng đầu vào
+    return index_peaks  # return all index of maximum local
 
 
 # get file name from path
@@ -50,24 +50,24 @@ def get_fine_name(path):
 # median filter
 def median_filter(arr, kernel_size):
     if type(arr) is not list:
-        arr = arr.tolist()  # Kiểm tra có phải kiểu dữ liệu "list" không
+        arr = arr.tolist()  # check data type "list"
 
-    length = len(arr)  # Lấy độ dài của mảng đầu vào
-    part = (kernel_size - 1) // 2  # Tính số phần tử ở mỗi bên (trái, phải)
-    med_arr = []  # Khởi tạo mảng mới để trả về kết quả
+    length = len(arr)  # get length of input array
+    part = (kernel_size - 1) // 2  # calc number of elements at (left, right) side
+    med_arr = []  # array after median filter
 
     for i in range(length):
         left = i - part
         right = i + part
-        if left < 0:  # Trường hợp bên trái không đủ phần tử
-            tmp = [0] * (0 - left) + arr[0:right + 1]  # Thêm phần tử 0 vào bên trái
-        elif right >= length:  # Trường hợp bên phải không đủ phần tử
-            tmp = arr[left:length] + [0] * (right - length + 1)  # Thêm phần tử 0 vào bên phải
-        else:  # Trường hợp hai bên đều đủ
+        if left < 0:  # out of index at left side
+            tmp = [0] * (0 - left) + arr[0:right + 1]  # add 0 element to left side
+        elif right >= length:  # out of index at right side
+            tmp = arr[left:length] + [0] * (right - length + 1)  # add 0 element to right side
+        else:
             tmp = arr[left: right + 1]
-        tmp.sort()  # Sắp xếp tăng dần
-        med_arr.append(tmp[part])  # Thêm vào mảng
-    return array(med_arr)  # Trả về kết quả sau khi lọc
+        tmp.sort()  # sort up ascending
+        med_arr.append(tmp[part])  # add element after filter
+    return array(med_arr)
 
 
 # calc all F0
