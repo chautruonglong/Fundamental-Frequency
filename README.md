@@ -24,4 +24,4 @@
 
 > ### Main Gui
 
-![alt text](screenshots/gui.png)
+![alt text](screenshots/gui.gif)
