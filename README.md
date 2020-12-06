@@ -20,7 +20,11 @@
 
 > ### A window contains F0
 
-![alt text](screenshots/window.png)
+![alt text](screenshots/window_f0.png)
+
+> ### A window not contains F0
+
+![alt text](screenshots/window_nan.png)
 
 > ### Main Gui
 
