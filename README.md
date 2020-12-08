@@ -8,6 +8,12 @@
 * Tools: pycharm
 * Python 3: tkinter, matplotlib, numpy, scipy
 
+## To run code
+Run:
+```shell 
+python main.py 
+```
+
 ## Fundamental frequency(F0) on time domain using auto correlation function
 
 > ### A periodicity window of a signal
