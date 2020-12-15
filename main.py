@@ -90,7 +90,7 @@ def show_wave():
 def file_btn_clicked(event):
     global is_loader
     if is_loader is False:
-        loader.place(x=120, y=445)
+        loader.place(x=120, y=515)
         is_loader = True
         Thread(target=show_wave).start()
 
