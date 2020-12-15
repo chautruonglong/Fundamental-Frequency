@@ -37,7 +37,7 @@ root = Tk()
 WIDTH_SCREEN = root.winfo_screenwidth()
 HEIGHT_SCREEN = root.winfo_screenheight()
 # set title for window
-root.title('Basic Frequency')
+root.title('Fundamental Frequency')
 # window size
 WIDTH = 1200
 HEIGHT = 800
@@ -195,7 +195,7 @@ pitch_btn.bind('<Button-1>', pitch_btn_clicked)
 pitch_btn.place(x=10, y=510, width=100)
 
 # add loader icon
-frames = [PhotoImage(file='.\\image\\loader.gif', format='gif -index %i' % i) for i in range(8)]
+frames = [PhotoImage(file='./image/loader.gif', format='gif -index %i' % i) for i in range(8)]
 loader = Label(root)
 is_loader = False
 
