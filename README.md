@@ -17,21 +17,32 @@ python main.py
 ## Fundamental frequency(F0) on time domain using auto correlation function
 
 > ### A periodicity window of a signal
-<p align="center"><img src="screenshots/periodicity.png" alt="alt text" style="max-width:100%;"></p>
+
+<p align="center">
+    <img src="screenshots/periodicity.png" alt="alt text" style="max-width:100%;">
+</p>
 
 
 > ### A non periodicity window of a signal
 
-![alt text](screenshots/n_periodicity.png)
+<p align="center">
+    <img src="screenshots/n_periodicity.png" alt="alt text" style="max-width:100%;">
+</p>
 
 > ### A window contains F0
 
-![alt text](screenshots/window_f0.png)
+<p align="center">
+    <img src="screenshots/window_f0.png" alt="alt text" style="max-width:100%;">
+</p>
 
 > ### A window not contains F0
 
-![alt text](screenshots/window_nan.png)
+<p align="center">
+    <img src="screenshots/window_nan.png" alt="alt text" style="max-width:100%;">
+</p>
 
 > ### Main Gui
 
-![alt text](screenshots/gui.gif)
+<p align="center">
+    <img src="screenshots/gui.gif" alt="alt text" style="max-width:100%;">
+</p>
