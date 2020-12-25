@@ -17,9 +17,7 @@ python main.py
 ## Fundamental frequency(F0) on time domain using auto correlation function
 
 > ### A periodicity window of a signal
-<center>
-  <img src="/chautruonglong/Fundamental-Frequency/raw/main/screenshots/periodicity.png" alt="alt text" style="max-width:100%;">
-</center>
+<center><img src="/chautruonglong/Fundamental-Frequency/raw/main/screenshots/periodicity.png" alt="alt text" style="max-width:100%;"></center>
 ![alt text](screenshots/periodicity.png)
 
 > ### A non periodicity window of a signal
