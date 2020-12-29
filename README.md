@@ -1,11 +1,13 @@
-# WRITEN BY chau truong long
+# Fundamental Frequency
+
+> WRITTEN BY chau truong long
 
 * Email 1: truonglongchau@gmail.com
 * Email 2: 102180171@sv.dut.edu.vn
   
 ## Tools and language
 
-* Tools: pycharm
+* Tools: Pycharm
 * Python 3: tkinter, matplotlib, numpy, scipy
 
 ## To run code
