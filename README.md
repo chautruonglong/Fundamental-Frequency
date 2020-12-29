@@ -5,18 +5,18 @@
 * Email 1: truonglongchau@gmail.com
 * Email 2: 102180171@sv.dut.edu.vn
   
-## Tools and language
+# Tools and language
 
 * Tools: Pycharm
 * Python 3: tkinter, matplotlib, numpy, scipy
 
-## To run code
+# How to run code
 Run:
 ```shell 
 python main.py 
 ```
 
-## Fundamental frequency(F0) on time domain using auto correlation function
+# Fundamental frequency(F0) on time domain using auto correlation function
 
 > ### A periodicity window of a signal
 
