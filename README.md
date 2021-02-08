@@ -20,7 +20,7 @@ python main.py
 
 > ### Auto correlated funtion
 
-- ##### Origin (big O(n^{2}))
+- ##### Origin (big O(n<sup>2</sup>))
 <p align="center">
     <img src="screenshots/auto_ori.png" alt="alt text" style="max-width:100%;">
 </p>
