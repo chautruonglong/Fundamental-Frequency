@@ -20,12 +20,12 @@ python main.py
 
 > ### Auto correlated funtion
 
-- ##### Origin (big O($n^2$))
+- ##### Origin (big O(n^2))
 <p align="center">
     <img src="screenshots/auto_ori.png" alt="alt text" style="max-width:100%;">
 </p>
 
-- ##### Improvement (big O($nlog(n)$))
+- ##### Improvement (big O(nlog(n)))
 <p align="center">
     <img src="screenshots/auto_fft.png" alt="alt text" style="max-width:100%;">
 </p>
