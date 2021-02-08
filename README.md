@@ -18,33 +18,39 @@ python main.py
 
 # Fundamental frequency(F0) on time domain using auto correlation function
 
-> ### A periodicity window of a signal
+> ### Auto correlated funtion
 
+- ##### Origin (big O($n^2$))
+<p align="center">
+    <img src="screenshots/auto_ori.png" alt="alt text" style="max-width:100%;">
+</p>
+
+- ##### Improvement (big O($nlog(n)$))
+<p align="center">
+    <img src="screenshots/auto_fft.png" alt="alt text" style="max-width:100%;">
+</p>
+
+> ### A periodicity window of a signal
 <p align="center">
     <img src="screenshots/periodicity.png" alt="alt text" style="max-width:100%;">
 </p>
 
-
 > ### A non periodicity window of a signal
-
 <p align="center">
     <img src="screenshots/n_periodicity.png" alt="alt text" style="max-width:100%;">
 </p>
 
 > ### A window contains F0
-
 <p align="center">
     <img src="screenshots/window_f0.png" alt="alt text" style="max-width:100%;">
 </p>
 
 > ### A window not contains F0
-
 <p align="center">
     <img src="screenshots/window_nan.png" alt="alt text" style="max-width:100%;">
 </p>
 
 > ### Main Gui
-
 <p align="center">
     <img src="screenshots/gui.gif" alt="alt text" style="max-width:100%;">
 </p>
