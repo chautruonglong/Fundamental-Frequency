@@ -1,5 +1,5 @@
-from tkinter import Tk, Button, PhotoImage, Toplevel
-from tkinter.ttk import Combobox, Label
+from tkinter import Tk, Toplevel, Frame, Label
+from tkinter.ttk import Combobox, Style, Progressbar
 from tkinter.filedialog import askopenfilename
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg as Canvas
 from matplotlib.pyplot import Figure
@@ -23,12 +23,26 @@ window = 0  # number of samples per window (samples)
 ham = []  # hamming window function
 min_frame = 0  # frame at F0 = 75 Hz of window
 max_frame = 0  # frame at F0 = 350 Hz of window
+loader_frame = None
+worker_thread = None
+worker_kind = ''
+worker_result = None
+
+SIDEBAR_WIDTH = 150
+SIDEBAR_BG = '#efefef'
+BUTTON_BG = '#0052cc'
+BUTTON_ACTIVE_BG = '#0d66e5'
+BUTTON_FG = '#ffffff'
+LABEL_FG = '#222222'
+INPUT_BG = '#ffffff'
+INPUT_FG = '#222222'
+CANVAS_BG = '#ffffff'
 
 
 # handle event root resize
 def root_resize(event):
-    canvas.get_tk_widget().place(x=150, y=0, width=root.winfo_width() - 150, height=root.winfo_height())
-    child.geometry('%ix%i+%i+%i' % (500, 500, root.winfo_x() + (root.winfo_width() - 500) // 2, root.winfo_y()))
+    sidebar.place(x=0, y=0, width=SIDEBAR_WIDTH, height=root.winfo_height())
+    canvas.get_tk_widget().place(x=SIDEBAR_WIDTH, y=0, width=root.winfo_width() - SIDEBAR_WIDTH, height=root.winfo_height())
 
 
 # create window
@@ -47,22 +61,103 @@ root.wm_minsize(WIDTH, HEIGHT)
 root.geometry("%dx%d+%d+%d" % (WIDTH, HEIGHT, (WIDTH_SCREEN - WIDTH) // 2, (HEIGHT_SCREEN - HEIGHT) // 2))
 # add event resize
 root.bind('<Configure>', root_resize)
+root.configure(bg=SIDEBAR_BG)
+root.tk_setPalette(
+    background=SIDEBAR_BG,
+    foreground=LABEL_FG,
+    activeBackground=BUTTON_ACTIVE_BG,
+    activeForeground=BUTTON_FG,
+    highlightBackground=SIDEBAR_BG,
+    selectBackground='#cfe3ff',
+    selectForeground=LABEL_FG
+)
+
+style = Style(root)
+style.theme_use('clam')
+style.configure(
+    'Sidebar.TCombobox',
+    padding=2,
+    fieldbackground=INPUT_BG,
+    background=INPUT_BG,
+    foreground=INPUT_FG,
+    arrowcolor=INPUT_FG,
+    bordercolor='#b8b8b8',
+    lightcolor=INPUT_BG,
+    darkcolor=INPUT_BG
+)
+style.map(
+    'Sidebar.TCombobox',
+    fieldbackground=[('readonly', INPUT_BG)],
+    background=[('readonly', INPUT_BG)],
+    foreground=[('readonly', INPUT_FG)],
+    arrowcolor=[('readonly', INPUT_FG)]
+)
+style.configure(
+    'Loader.Horizontal.TProgressbar',
+    troughcolor=SIDEBAR_BG,
+    background=BUTTON_BG,
+    bordercolor=SIDEBAR_BG,
+    lightcolor=BUTTON_BG,
+    darkcolor=BUTTON_BG
+)
+
+sidebar = Frame(root, bg=SIDEBAR_BG)
+sidebar.place(x=0, y=0, width=SIDEBAR_WIDTH, height=HEIGHT)
+
+
+def make_sidebar_button(text, callback, x, y, width=100, height=28):
+    button = Label(
+        sidebar,
+        text=text,
+        font=('segoe ui', 10),
+        bg=BUTTON_BG,
+        fg=BUTTON_FG,
+        relief='solid',
+        bd=1,
+        highlightthickness=0,
+        cursor='hand2',
+        anchor='center'
+    )
+    button.place(x=x, y=y, width=width, height=height)
+    button.bind('<Button-1>', callback)
+    button.bind('<Enter>', lambda event, widget=button: widget.configure(bg=BUTTON_ACTIVE_BG))
+    button.bind('<Leave>', lambda event, widget=button: widget.configure(bg=BUTTON_BG))
+    return button
 
 
 def show_wave():
-    global data, duration, time, path, scatter_1, scatter_2, plot_3, is_loader, is_redraw  # set global vars
-    path = askopenfilename(filetypes=[('Wave file', '.wav')])  # show open file dialog
-    if path == '':
-        loader.place_forget()
-        is_loader = False
+    selected_path = askopenfilename(filetypes=[('Wave file', '.wav')])  # show open file dialog
+    if selected_path == '':
         return
 
-    fs, data = read(path)  # read wave file
-    data = data / data.max()  # convert amplitude to [-1, 1]
-    duration = len(data) / fs  # calc duration of wave file
-    time = linspace(0, duration, len(data))
+    start_loader('Loading file...')
+    start_worker('wave', load_wave_data, selected_path)
 
-    # update figure
+
+def load_wave_data(selected_path):
+    try:
+        fs, loaded_data = read(selected_path)  # read wave file
+        if len(loaded_data.shape) > 1:
+            loaded_data = loaded_data.mean(axis=1)
+
+        max_value = abs(loaded_data).max()
+        if max_value != 0:
+            loaded_data = loaded_data / max_value  # convert amplitude to [-1, 1]
+
+        loaded_duration = len(loaded_data) / fs  # calc duration of wave file
+        loaded_time = linspace(0, loaded_duration, len(loaded_data))
+        set_worker_result(('success', selected_path, loaded_data, loaded_duration, loaded_time))
+    except Exception:
+        set_worker_result(('error',))
+
+
+def apply_wave_data(selected_path, loaded_data, loaded_duration, loaded_time):
+    global data, duration, time, path, scatter_1, scatter_2, plot_3, is_redraw
+    path = selected_path
+    data = loaded_data
+    duration = loaded_duration
+    time = loaded_time
+
     if scatter_1 is not None:
         scatter_1.remove()
         scatter_1 = None
@@ -73,71 +168,121 @@ def show_wave():
         plot_3.pop(0).remove()
         plot_3 = None
 
-    # set x
+    graph_1.clear()
+    graph_1.set_ylabel('Frequency (Hz)')
+    graph_1.set_xlabel('Time')
+    graph_1.set_ylim(0, 400)
     graph_1.set_xlim(0, duration)
+
+    graph_2.clear()
+    graph_2.set_ylabel('Frequency (Hz)')
+    graph_2.set_xlabel('Time')
+    graph_2.set_ylim(0, 400)
     graph_2.set_xlim(0, duration)
+
+    graph_3.clear()
+    graph_3.set_ylabel('Amplitude')
+    graph_3.set_xlabel('Time')
     graph_3.set_xlim(0, duration)
+    plot_3 = graph_3.plot(time, data)
+    graph_3.set_title(get_fine_name(path) + ', ' + str(round(duration, 2)) + '(s)')
 
-    plot_3 = graph_3.plot(time, data)  # new plot
-    graph_3.set_title(get_fine_name(path) + ', ' + str(round(duration, 2)) + '(s)')  # set name wave file
-
-    loader.place_forget()
-    is_loader = False
+    child.withdraw()
     is_redraw = True
 
 
 # handle event file button
 def file_btn_clicked(event):
-    global is_loader
     if is_loader is False:
-        loader.place(x=120, y=515)
-        is_loader = True
-        Thread(target=show_wave).start()
+        show_wave()
 
 
 # add file button
-file_btn = Button(root)
-file_btn.configure(text='Open file', font=('segoe ui', 10), bg='#0052cc', fg='#ffffff')
-file_btn.bind('<Button-1>', file_btn_clicked)
-file_btn.place(x=10, y=250, width=100)
+file_btn = make_sidebar_button('Open file', file_btn_clicked, 10, 250)
 
 # add window length label
-win_len_label = Label(root)
-win_len_label.configure(text='Window length:', font=('segoe ui', 10))
+win_len_label = Label(sidebar)
+win_len_label.configure(text='Window length:', font=('segoe ui', 10), bg=SIDEBAR_BG, fg=LABEL_FG)
 win_len_label.place(x=10, y=300, width=100)
 
 # add window combobox
-win_box = Combobox(root)
+win_box = Combobox(sidebar, style='Sidebar.TCombobox')
 win_box.configure(value=['10 ms', '20 ms', '30 ms', '40 ms', '50 ms', '60 ms'], state='readonly')
 win_box.current(3)
 win_box.place(x=10, y=320, width=100)
 
 # add kernel size label
-ker_size_label = Label(root)
-ker_size_label.configure(text='Kernel size:', font=('segoe ui', 10))
+ker_size_label = Label(sidebar)
+ker_size_label.configure(text='Kernel size:', font=('segoe ui', 10), bg=SIDEBAR_BG, fg=LABEL_FG)
 ker_size_label.place(x=10, y=370, width=100)
 
 # add kernel size combobox
-ker_box = Combobox(root)
+ker_box = Combobox(sidebar, style='Sidebar.TCombobox')
 ker_box.configure(value=[3, 5, 7, 9, 11, 13], state='readonly')
 ker_box.current(1)
 ker_box.place(x=10, y=390, width=100)
 
 # add threshold label
-hold_label = Label(root)
-hold_label.configure(text='Threshold:', font=('segoe ui', 10))
+hold_label = Label(sidebar)
+hold_label.configure(text='Threshold:', font=('segoe ui', 10), bg=SIDEBAR_BG, fg=LABEL_FG)
 hold_label.place(x=10, y=440, width=100)
 
 # add threshold combobox
-hold_box = Combobox(root)
+hold_box = Combobox(sidebar, style='Sidebar.TCombobox')
 hold_box.configure(value=['30%', '50%', '70%'], state='readonly')
 hold_box.current(0)
 hold_box.place(x=10, y=460, width=100)
 
 
 def show_pitch_contour():
-    global scatter_1, scatter_2, is_loader, is_redraw, win_len, ker_size, ratio, window, ham, min_frame, max_frame
-    # update figure
+    selected_win_len = int(win_box.get()[0:2])
+    selected_ker_size = int(ker_box.get())
+    selected_ratio = int(hold_box.get()[0:2]) / 100
+    start_worker('pitch', compute_pitch_contour, selected_win_len, selected_ker_size, selected_ratio)
+
+
+def compute_pitch_contour(selected_win_len, selected_ker_size, selected_ratio):
+    try:
+        computed_window = max(1, int(selected_win_len * len(data) / (duration * 1000)))
+        computed_ham = hamming(computed_window)
+        min_delay = 1000 / 350  # ms
+        max_delay = 1000 / 75  # ms
+        computed_min_frame = int(min_delay * computed_window / selected_win_len)
+        computed_max_frame = int(max_delay * computed_window / selected_win_len)
+
+        F0s, indexes = pitch_contour(
+            data,
+            selected_win_len,
+            computed_window,
+            computed_ham,
+            selected_ratio,
+            computed_min_frame,
+            computed_max_frame
+        )
+
+        indexes = [index * duration / len(data) for index in indexes]
+        set_worker_result(
+            (
+                'success',
+                selected_win_len,
+                selected_ker_size,
+                selected_ratio,
+                computed_window,
+                computed_ham,
+                computed_min_frame,
+                computed_max_frame,
+                F0s,
+                indexes
+            )
+        )
+    except Exception:
+        set_worker_result(('error',))
+
+
+def apply_pitch_contour(selected_win_len, selected_ker_size, selected_ratio, computed_window, computed_ham,
+                        computed_min_frame, computed_max_frame, F0s, indexes):
+    global scatter_1, scatter_2, is_redraw, win_len, ker_size, ratio, window, ham, min_frame, max_frame
+
     if scatter_1 is not None:
         scatter_1.remove()
         scatter_1 = None
@@ -145,62 +290,118 @@ def show_pitch_contour():
         scatter_2.remove()
         scatter_2 = None
 
-    # get data from user
-    win_len = int(win_box.get()[0:2])
-    ker_size = int(ker_box.get())
-    ratio = int(hold_box.get()[0:2]) / 100
+    win_len = selected_win_len
+    ker_size = selected_ker_size
+    ratio = selected_ratio
+    window = computed_window
+    ham = computed_ham
+    min_frame = computed_min_frame
+    max_frame = computed_max_frame
 
-    # calc params
-    window = int((win_len * len(data) / (duration * 1000)))
-    ham = hamming(window)
-    min_delay = 1000 / 350  # ms
-    max_delay = 1000 / 75  # ms
-    min_frame = int(min_delay * window / win_len)
-    max_frame = int(max_delay * window / win_len)
+    if len(F0s) == 0:
+        graph_2.set_title('Before median filter, F0 = NaN')
+        graph_1.set_title('After median filter, F0 = NaN')
+        child.withdraw()
+        is_redraw = True
+        return
 
-    # pitch contour to find basic frequency
-    F0s, indexes = pitch_contour(data, win_len, window, ham, ratio, min_frame, max_frame)
-
-    # convert samples to time
-    for i in range(len(indexes)):
-        indexes[i] *= duration / len(data)
-
-    # scatter before median filter
-    graph_2.set_title('Before median filter, F0 = ' + str(round(sum(F0s) / len(F0s), 3)))
+    avg_before = round(sum(F0s) / len(F0s), 3)
+    graph_2.set_title('Before median filter, F0 = ' + str(avg_before))
     scatter_2 = graph_2.scatter(indexes, F0s, color='black', marker='*', s=15)
 
-    # scatter after median filter
-    F0s = median_filter(F0s, ker_size)
-    graph_1.set_title('After median filter, F0 = ' + str(round(sum(F0s) / len(F0s), 3)))
-    scatter_1 = graph_1.scatter(indexes, F0s, color='black', marker='*', s=15)
+    filtered_F0s = median_filter(F0s, ker_size)
+    avg_after = round(sum(filtered_F0s) / len(filtered_F0s), 3)
+    graph_1.set_title('After median filter, F0 = ' + str(avg_after))
+    scatter_1 = graph_1.scatter(indexes, filtered_F0s, color='black', marker='*', s=15)
 
-    loader.place_forget()
-    is_loader = False
     is_redraw = True
 
 
 # handle event pitch button
 def pitch_btn_clicked(event):
-    global is_loader
     if is_loader is False and duration != 0:
-        loader.place(x=120, y=515)
-        is_loader = True
-        Thread(target=show_pitch_contour).start()
+        start_loader('Processing...')
+        show_pitch_contour()
 
 
 # add pitch button
-pitch_btn = Button(root)
-pitch_btn.configure(text='Pitch contour', font=('segoe ui', 10), bg='#0052cc', fg='#ffffff')
-pitch_btn.bind('<Button-1>', pitch_btn_clicked)
-pitch_btn.place(x=10, y=510, width=100)
+pitch_btn = make_sidebar_button('Pitch contour', pitch_btn_clicked, 10, 510)
 
-# add loader icon
-frames = [PhotoImage(file='./image/loader.gif', format='gif -index %i' % i) for i in range(8)]
-loader = Label(root)
 is_loader = False
+
+
+def start_loader(message):
+    global is_loader, loader_frame
+    is_loader = True
+    if loader_frame is not None and loader_frame.winfo_exists():
+        loader_frame.destroy()
+
+    loader_frame = Frame(sidebar, bg=SIDEBAR_BG)
+    loader_frame.place(x=10, y=548, width=130, height=34)
+
+    loader_label = Label(loader_frame, text=message, font=('segoe ui', 10), bg=SIDEBAR_BG, fg=LABEL_FG, anchor='w')
+    loader_label.place(x=0, y=0, width=130, height=20)
+
+    loader_bar = Progressbar(loader_frame, mode='indeterminate', style='Loader.Horizontal.TProgressbar')
+    loader_bar.place(x=0, y=24, width=80, height=10)
+    loader_bar.start(10)
+
+    loader_frame.loader_bar = loader_bar
+    root.update_idletasks()
+
+
+def stop_loader():
+    global is_loader, loader_frame
+    is_loader = False
+    if loader_frame is not None and loader_frame.winfo_exists():
+        loader_frame.loader_bar.stop()
+        loader_frame.destroy()
+    loader_frame = None
+    root.update_idletasks()
+
+
+def set_worker_result(result):
+    global worker_result
+    worker_result = result
+
+
+def start_worker(kind, target, *args):
+    global worker_thread, worker_kind, worker_result
+    worker_kind = kind
+    worker_result = None
+    worker_thread = Thread(target=target, args=args, daemon=True)
+    worker_thread.start()
+    root.after(30, finish_worker_if_ready)
+
+
+def finish_worker_if_ready():
+    global worker_thread, worker_kind, worker_result
+    if worker_thread is None:
+        stop_loader()
+        return
+
+    if worker_thread.is_alive():
+        root.after(30, finish_worker_if_ready)
+        return
+
+    result = worker_result
+    completed_kind = worker_kind
+    worker_thread = None
+    worker_kind = ''
+    worker_result = None
+
+    try:
+        if result is not None and result[0] == 'success':
+            if completed_kind == 'wave':
+                apply_wave_data(*result[1:])
+            elif completed_kind == 'pitch':
+                apply_pitch_contour(*result[1:])
+    finally:
+        stop_loader()
 
 # create new figure
 figure = Figure()
+figure.patch.set_facecolor(CANVAS_BG)
 is_redraw = False
 
 # for before median filter
@@ -230,26 +431,30 @@ figure.tight_layout()
 
 # handle mouse events canvas
 def axes_moved(event):
-    if window != 0 and duration != 0 and event.inaxes == graph_3:
-        child.deiconify()
+    if window == 0 or duration == 0 or event.inaxes != graph_3 or event.xdata is None:
+        return
 
-        bbox = graph_3.get_window_extent().transformed(figure.dpi_scale_trans.inverted())
-        width = int(bbox.width * figure.dpi)
-        x0 = bbox.x0 * figure.dpi + 1
+    child.deiconify()
+    child.geometry('%ix%i+%i+%i' % (500, 500, root.winfo_pointerx() + 20, root.winfo_pointery() + 20))
 
-        frame = (event.x - x0) * len(data) // width
-        if frame < 0:
-            frame = 0
-        elif frame > len(data) - window:
-            frame = len(data) - window
+    frame = int(event.xdata * len(data) / duration)
+    if frame < 0:
+        frame = 0
+    elif frame > len(data) - window:
+        frame = len(data) - window
 
-        update_child_fig(int(frame))
+    update_child_fig(frame)
+
+
+def axes_left(event):
+    child.withdraw()
 
 
 # add figure
 canvas = Canvas(figure, root)
 canvas.mpl_connect('motion_notify_event', axes_moved)
-canvas.get_tk_widget().place(x=150, y=0, width=WIDTH - 150, height=HEIGHT)
+canvas.mpl_connect('axes_leave_event', axes_left)
+canvas.get_tk_widget().place(x=SIDEBAR_WIDTH, y=0, width=WIDTH - SIDEBAR_WIDTH, height=HEIGHT)
 
 
 # handle child resize
@@ -265,6 +470,7 @@ child.withdraw()
 
 # child figure
 child_figure = Figure()
+child_figure.patch.set_facecolor(CANVAS_BG)
 
 child_graph_1 = child_figure.add_subplot(211)
 child_plot_1 = None
@@ -272,9 +478,9 @@ child_figure.tight_layout()
 
 child_graph_2 = child_figure.add_subplot(212)
 child_plot_2 = None
-child_v_line_2 = None
-child_left_line_2 = None
-child_right_line_2 = None
+child_h_line_2 = None
+child_left_v_line_2 = None
+child_right_v_line_2 = None
 child_scatter_2 = None
 child_figure.tight_layout()
 
@@ -353,7 +559,6 @@ def root_update(index):
 
     if index == 8:
         index = 0
-    loader.configure(image=frames[index])
 
     if is_redraw is True:
         figure.canvas.draw()
