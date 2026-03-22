@@ -1,10 +1,10 @@
-from tkinter import Tk, Toplevel, Frame, Label
+from tkinter import Tk, Frame, Label
 from tkinter.ttk import Combobox, Style, Progressbar
 from tkinter.filedialog import askopenfilename
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg as Canvas
 from matplotlib.pyplot import Figure
 from scipy.io.wavfile import read
-from function import get_fine_name, pitch_contour, median_filter, fftautocorr, autocorr, find_peaks, get_index_of_max_local
+from function import get_fine_name, pitch_contour, median_filter, fftautocorr, find_peaks, get_index_of_max_local
 from warnings import filterwarnings
 from numpy import linspace, hamming
 from threading import Thread
@@ -27,6 +27,16 @@ loader_frame = None
 worker_thread = None
 worker_kind = ''
 worker_result = None
+child_has_custom_position = False
+pending_hover_frame = None
+hover_render_job = None
+child_visible = False
+child_drag_offset_x = 0
+child_drag_offset_y = 0
+hover_hide_job = None
+child_shadow = None
+child_panel = None
+child_canvas = None
 
 SIDEBAR_WIDTH = 150
 SIDEBAR_BG = '#efefef'
@@ -37,12 +47,20 @@ LABEL_FG = '#222222'
 INPUT_BG = '#ffffff'
 INPUT_FG = '#222222'
 CANVAS_BG = '#ffffff'
+PANEL_BG = '#ffffff'
+PANEL_HEADER_BG = '#1f2937'
+PANEL_HEADER_FG = '#ffffff'
+PANEL_BORDER = '#cbd5e1'
+PANEL_SHADOW = '#d7dde7'
+PANEL_SHADOW_PAD = 10
 
 
 # handle event root resize
 def root_resize(event):
     sidebar.place(x=0, y=0, width=SIDEBAR_WIDTH, height=root.winfo_height())
     canvas.get_tk_widget().place(x=SIDEBAR_WIDTH, y=0, width=root.winfo_width() - SIDEBAR_WIDTH, height=root.winfo_height())
+    if child_visible is True and child_has_custom_position is False:
+        place_child_panel_default()
 
 
 # create window
@@ -187,7 +205,7 @@ def apply_wave_data(selected_path, loaded_data, loaded_duration, loaded_time):
     plot_3 = graph_3.plot(time, data)
     graph_3.set_title(get_fine_name(path) + ', ' + str(round(duration, 2)) + '(s)')
 
-    child.withdraw()
+    hide_child_window()
     is_redraw = True
 
 
@@ -301,7 +319,7 @@ def apply_pitch_contour(selected_win_len, selected_ker_size, selected_ratio, com
     if len(F0s) == 0:
         graph_2.set_title('Before median filter, F0 = NaN')
         graph_1.set_title('After median filter, F0 = NaN')
-        child.withdraw()
+        hide_child_window()
         is_redraw = True
         return
 
@@ -430,83 +448,243 @@ figure.tight_layout()
 
 
 # handle mouse events canvas
-def axes_moved(event):
-    if window == 0 or duration == 0 or event.inaxes != graph_3 or event.xdata is None:
+def hide_child_window(event=None):
+    global pending_hover_frame, child_visible, hover_hide_job, child_shadow, child_panel, child_canvas
+    pending_hover_frame = None
+    if hover_render_job is not None:
+        root.after_cancel(hover_render_job)
+    clear_hover_job()
+    if hover_hide_job is not None:
+        root.after_cancel(hover_hide_job)
+        hover_hide_job = None
+    if child_canvas is not None and child_canvas.get_tk_widget().winfo_exists():
+        child_canvas.get_tk_widget().destroy()
+    if child_panel is not None and child_panel.winfo_exists():
+        child_panel.destroy()
+    if child_shadow is not None and child_shadow.winfo_exists():
+        child_shadow.destroy()
+    child_shadow = None
+    child_panel = None
+    child_canvas = None
+    child_visible = False
+
+
+def canvas_motion(event):
+    global pending_hover_frame
+
+    if window == 0 or duration == 0:
         return
 
-    child.deiconify()
-    child.geometry('%ix%i+%i+%i' % (500, 500, root.winfo_pointerx() + 20, root.winfo_pointery() + 20))
+    canvas_widget = canvas.get_tk_widget()
+    mpl_x = event.x
+    mpl_y = canvas_widget.winfo_height() - event.y
 
-    frame = int(event.xdata * len(data) / duration)
+    if not graph_3.bbox.contains(mpl_x, mpl_y):
+        hide_child_window()
+        return
+
+    xdata, _ = graph_3.transData.inverted().transform((mpl_x, mpl_y))
+    if xdata < 0 or xdata > duration:
+        hide_child_window()
+        return
+
+    show_child_window()
+
+    center_frame = int(xdata * len(data) / duration)
+    frame = center_frame - window // 2
     if frame < 0:
         frame = 0
     elif frame > len(data) - window:
         frame = len(data) - window
 
-    update_child_fig(frame)
+    pending_hover_frame = frame
+    refresh_hover_hide_timer()
+    schedule_child_render()
 
 
-def axes_left(event):
-    child.withdraw()
+def schedule_child_render():
+    global hover_render_job
+    if hover_render_job is None:
+        hover_render_job = root.after_idle(render_pending_child_fig)
+
+
+def clear_hover_job():
+    global hover_render_job
+    hover_render_job = None
+
+
+def pointer_inside_graph_3():
+    if window == 0 or duration == 0:
+        return False
+
+    canvas_widget = canvas.get_tk_widget()
+    pointer_root_x = root.winfo_pointerx()
+    pointer_root_y = root.winfo_pointery()
+    hovered_widget = root.winfo_containing(pointer_root_x, pointer_root_y)
+
+    if hovered_widget is None:
+        return False
+
+    current = hovered_widget
+    while current is not None and current is not canvas_widget:
+        current = current.master
+    if current is not canvas_widget:
+        return False
+
+    pointer_x = pointer_root_x - canvas_widget.winfo_rootx()
+    pointer_y = pointer_root_y - canvas_widget.winfo_rooty()
+
+    if pointer_x < 0 or pointer_y < 0:
+        return False
+    if pointer_x > canvas_widget.winfo_width() or pointer_y > canvas_widget.winfo_height():
+        return False
+
+    mpl_y = canvas_widget.winfo_height() - pointer_y
+    return graph_3.bbox.contains(pointer_x, mpl_y)
+
+
+def refresh_hover_hide_timer():
+    global hover_hide_job
+    if hover_hide_job is not None:
+        root.after_cancel(hover_hide_job)
+    hover_hide_job = root.after(120, hide_child_window)
 
 
 # add figure
 canvas = Canvas(figure, root)
-canvas.mpl_connect('motion_notify_event', axes_moved)
-canvas.mpl_connect('axes_leave_event', axes_left)
 canvas.get_tk_widget().place(x=SIDEBAR_WIDTH, y=0, width=WIDTH - SIDEBAR_WIDTH, height=HEIGHT)
+canvas.get_tk_widget().bind('<Motion>', canvas_motion)
+canvas.get_tk_widget().bind('<Leave>', hide_child_window)
 
 
-# handle child resize
-def child_resize(event):
-    child_canvas.get_tk_widget().place(x=0, y=0, width=child.winfo_width(), height=child.winfo_height())
+def child_resize():
+    if child_canvas is None or child_panel is None:
+        return
+    child_canvas.get_tk_widget().place(x=0, y=34, width=child_panel.winfo_width(), height=child_panel.winfo_height() - 34)
 
 
-# child tk for show window
-child = Toplevel(root)
-child.protocol('WM_DELETE_WINDOW', lambda: child.withdraw())
-child.bind('<Configure>', child_resize)
-child.withdraw()
+def start_child_drag(event):
+    global child_drag_offset_x, child_drag_offset_y, child_has_custom_position
+    child_drag_offset_x = event.x
+    child_drag_offset_y = event.y
+    child_has_custom_position = True
+
+
+def drag_child_panel(event):
+    if child_panel is None or child_shadow is None:
+        return
+    panel_width = child_panel.winfo_width()
+    panel_height = child_panel.winfo_height()
+    x = child_panel.winfo_x() + event.x - child_drag_offset_x
+    y = child_panel.winfo_y() + event.y - child_drag_offset_y
+    x = max(SIDEBAR_WIDTH, min(x, root.winfo_width() - panel_width))
+    y = max(0, min(y, root.winfo_height() - panel_height))
+    child_shadow.place(
+        x=x - PANEL_SHADOW_PAD,
+        y=y - PANEL_SHADOW_PAD,
+        width=panel_width + PANEL_SHADOW_PAD * 2,
+        height=panel_height + PANEL_SHADOW_PAD * 2
+    )
+    child_panel.place(x=x, y=y, width=panel_width, height=panel_height)
+
+
+def create_child_panel():
+    global child_shadow, child_panel, child_canvas
+    child_shadow = Frame(root, bg=PANEL_SHADOW, bd=0, highlightthickness=0)
+    child_panel = Frame(root, bg=PANEL_BG, highlightbackground=PANEL_BORDER, highlightthickness=1, bd=0)
+    child_header = Frame(child_panel, bg=PANEL_HEADER_BG, height=34)
+    child_header.place(x=0, y=0, relwidth=1)
+    child_title = Label(child_header, text='Window Details', font=('segoe ui', 11, 'bold'),
+                        bg=PANEL_HEADER_BG, fg=PANEL_HEADER_FG)
+    child_title.place(relx=0.5, x=-90, y=6, width=180, height=22)
+    child_canvas = Canvas(child_figure, child_panel)
+    child_header.bind('<ButtonPress-1>', start_child_drag)
+    child_header.bind('<B1-Motion>', drag_child_panel)
+    child_title.bind('<ButtonPress-1>', start_child_drag)
+    child_title.bind('<B1-Motion>', drag_child_panel)
 
 # child figure
-child_figure = Figure()
+child_figure = Figure(constrained_layout=True)
 child_figure.patch.set_facecolor(CANVAS_BG)
 
 child_graph_1 = child_figure.add_subplot(211)
-child_plot_1 = None
-child_figure.tight_layout()
-
 child_graph_2 = child_figure.add_subplot(212)
-child_plot_2 = None
-child_h_line_2 = None
-child_left_v_line_2 = None
-child_right_v_line_2 = None
-child_scatter_2 = None
-child_figure.tight_layout()
+
+
+def get_default_child_position():
+    child_width = 500
+    child_height = 500
+    top_gap = 0
+    x = SIDEBAR_WIDTH + (root.winfo_width() - SIDEBAR_WIDTH - child_width) // 2
+    y = top_gap
+    if x < SIDEBAR_WIDTH:
+        x = SIDEBAR_WIDTH
+    if y + child_height > root.winfo_height():
+        y = max(0, root.winfo_height() - child_height - top_gap)
+    return child_width, child_height, x, y
+
+
+def place_child_panel_default():
+    if child_panel is None or child_shadow is None:
+        create_child_panel()
+    child_width, child_height, x, y = get_default_child_position()
+    child_shadow.place(
+        x=x - PANEL_SHADOW_PAD,
+        y=y - PANEL_SHADOW_PAD,
+        width=child_width + PANEL_SHADOW_PAD * 2,
+        height=child_height + PANEL_SHADOW_PAD * 2
+    )
+    child_panel.place(x=x, y=y, width=child_width, height=child_height)
+    child_resize()
+
+
+def show_child_window():
+    global child_visible
+    if child_panel is None or child_shadow is None or child_canvas is None:
+        create_child_panel()
+    if child_visible is False:
+        if child_has_custom_position is False:
+            place_child_panel_default()
+        else:
+            child_shadow.place(
+                x=child_panel.winfo_x() - PANEL_SHADOW_PAD,
+                y=child_panel.winfo_y() - PANEL_SHADOW_PAD,
+                width=child_panel.winfo_width() + PANEL_SHADOW_PAD * 2,
+                height=child_panel.winfo_height() + PANEL_SHADOW_PAD * 2
+            )
+            child_panel.place(x=child_panel.winfo_x(), y=child_panel.winfo_y(),
+                              width=child_panel.winfo_width(), height=child_panel.winfo_height())
+            child_resize()
+        child_visible = True
+    child_shadow.lift()
+    child_panel.lift()
+    child_panel.update_idletasks()
+
+
+def render_pending_child_fig():
+    global hover_render_job, pending_hover_frame
+    hover_render_job = None
+    if pending_hover_frame is None or child_visible is False:
+        return
+    update_child_fig(pending_hover_frame)
 
 
 def update_child_fig(frame):
-    global child_plot_1, child_plot_2, child_h_line_2, child_scatter_2, child_left_v_line_2, child_right_v_line_2
+    global child_graph_1, child_graph_2
     w = data[frame:frame + window] * ham
     a = fftautocorr(w)
     threshold = a[0] * ratio
     is_periodicity = True
+    hover_time = frame * duration / len(data)
 
-    # remove all old plot
-    if child_plot_1 is not None:
-        child_plot_1.pop(0).remove()
-        child_plot_1 = None
-        child_plot_2.pop(0).remove()
-        child_plot_2 = None
-        child_h_line_2.remove()
-        child_h_line_2 = None
-        child_left_v_line_2.remove()
-        child_left_v_line_2 = None
-        child_right_v_line_2.remove()
-        child_right_v_line_2 = None
-    if child_scatter_2 is not None:
-        child_scatter_2.remove()
-        child_scatter_2 = None
+    child_figure.clear()
+    child_graph_1 = child_figure.add_subplot(211)
+    child_graph_2 = child_figure.add_subplot(212)
+    child_graph_1.set_title('Window at %.3f s' % hover_time)
+    child_graph_1.set_xlabel('Sample')
+    child_graph_1.set_ylabel('Amplitude')
+    child_graph_2.set_xlabel('Delay')
+    child_graph_2.set_ylabel('Auto correlation')
 
     # plot original window
     child_graph_1.set_xlim(-20, window)
@@ -544,13 +722,10 @@ def update_child_fig(frame):
 
     if is_periodicity is True:
         child_graph_2.set_title('Periodicity, F0 = ' + str(round(F0, 3)))
-        child_scatter_2 = child_graph_2.scatter(max_indexes[max_index], max_local, color='red')
+        child_graph_2.scatter(max_indexes[max_index], max_local, color='red')
 
-    child_figure.canvas.draw()
-
-
-# child canvas
-child_canvas = Canvas(child_figure, child)
+    child_canvas.draw()
+    child_panel.update_idletasks()
 
 
 # handle root update
@@ -559,6 +734,9 @@ def root_update(index):
 
     if index == 8:
         index = 0
+
+    if child_visible is True and pointer_inside_graph_3() is False:
+        hide_child_window()
 
     if is_redraw is True:
         figure.canvas.draw()
