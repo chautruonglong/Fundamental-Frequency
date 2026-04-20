@@ -206,3 +206,13 @@ This project originally lived in a single large script. It has been refactored t
 - reduce duplicated logic
 - make hover, loader, and worker behavior easier to follow
 - keep `main.py` simple and readable
+
+## Star History
+
+<a href="https://www.star-history.com/#chautruonglong/Fundamental-Frequency&Timeline">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=chautruonglong/Fundamental-Frequency&type=Timeline&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=chautruonglong/Fundamental-Frequency&type=Timeline" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=chautruonglong/Fundamental-Frequency&type=Timeline" />
+ </picture>
+</a>
