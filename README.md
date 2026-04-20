@@ -209,10 +209,10 @@ This project originally lived in a single large script. It has been refactored t
 
 ## Star History
 
-<a href="https://www.star-history.com/#chautruonglong/Fundamental-Frequency&Timeline">
+<a href="https://www.star-history.com/?repos=chautruonglong%2FFundamental-Frequency&type=timeline&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=chautruonglong/Fundamental-Frequency&type=Timeline&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=chautruonglong/Fundamental-Frequency&type=Timeline" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=chautruonglong/Fundamental-Frequency&type=Timeline" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=chautruonglong/Fundamental-Frequency&type=timeline&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=chautruonglong/Fundamental-Frequency&type=timeline&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=chautruonglong/Fundamental-Frequency&type=timeline&legend=top-left" />
  </picture>
 </a>
